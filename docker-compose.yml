@@ -1,0 +1,26 @@
+# Full local stack: api + postgres + web
+# Placeholder skeleton — fill in image tags, env, and volumes as services are built.
+services:
+  postgres:
+      image: postgres:16
+          environment:
+                POSTGRES_USER: klasno
+                      POSTGRES_PASSWORD: klasno
+                            POSTGRES_DB: klasno
+                                ports:
+                                      - "5432:5432"
+
+                                        api:
+                                            build: ./services/api
+                                                depends_on:
+                                                      - postgres
+                                                          ports:
+                                                                - "8000:8000"
+
+                                                                  web:
+                                                                      build: ./web
+                                                                          depends_on:
+                                                                                - api
+                                                                                    ports:
+                                                                                          - "5173:5173"
+                                                                                          
