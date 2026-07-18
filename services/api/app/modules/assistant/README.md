@@ -1,4 +1,6 @@
-# module: assistant
+# Module: assistant
 
-AI chat: tool-calling loop with whitelisted tools (see ARCHITECTURE.md §19).
-Backed by the llm service.
+The assistant implements a provider-independent model adapter and a tool-calling
+loop. Models can call only whitelisted application tools and cannot access Cloud
+SQL or BigQuery directly. A hosted provider is used first; `services/llm` is a
+deferred self-hosting option.

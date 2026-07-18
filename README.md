@@ -1,26 +1,47 @@
-# klasno
+# Klasno
 
-Health + ERP platform: a modular monolith API, scheduled ingestion jobs, a self-hosted LLM, and a React SPA.
+Klasno is a student wellness and academic intelligence platform for schools in
+India. It combines wearable health data, school ERP data, privacy-aware
+analytics, and role-based experiences for students, guardians, teachers, and
+administrators.
 
-See ARCHITECTURE.md for the full design and docs/adr for decision records.
+The repository currently contains the architecture foundation. The existing
+GCP ingestion and transformation workloads will be migrated here incrementally.
 
 ## Repository layout
 
 ```text
-services/api        FastAPI modular monolith (users, health, erp, analytics, assistant)
-services/ingestion  Cloud Run Jobs (Fitbit sync, transform, token refresh, ERP processing)
-services/llm        vLLM serving an open model (Cloud Run GPU)
-web                 React (Vite) SPA
-infra               Terraform modules + per-env stacks (dev, staging, prod)
-docs                ADRs, runbooks, data dictionary
+services/api        FastAPI modular monolith
+services/ingestion  Cloud Run ingestion and transformation jobs
+services/llm        Deferred self-hosted LLM deployment stub
+web                 React and Vite SPA
+infra               Terraform modules and environment stacks
+docs                ADRs, runbooks, and the analytics data dictionary
 ```
 
-## Local development
+See [ARCHITECTURE.md](ARCHITECTURE.md) for component and data boundaries.
 
-Run the full local stack (api + postgres + web):
+## Local foundation
+
+Install Python development tooling with [uv](https://docs.astral.sh/uv/):
 
 ```bash
-docker compose up
+uv sync --extra dev
 ```
 
-See docker-compose.yml for details.
+Start the local Postgres dependency:
+
+```bash
+docker compose up -d postgres
+```
+
+The API and web containers will be added when those applications become
+runnable. Copy `.env.example` to `.env` for local values; never commit secrets.
+
+## Delivery order
+
+1. Migrate and validate the existing Cloud Run transformation job.
+2. Migrate the working health-data puller and scheduler behavior.
+3. Build daily wellness features and BigQuery marts.
+4. Expose tenant-safe analytics through the API and frontend.
+5. Add consent, deletion, audit, and school-pilot workflows.

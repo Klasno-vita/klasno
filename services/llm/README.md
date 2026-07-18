@@ -1,4 +1,5 @@
-# llm
+# LLM service (deferred)
 
-vLLM serving an open model (Cloud Run GPU). See ARCHITECTURE.md §19.2.
-Used by the assistant module's tool-calling loop.
+This directory reserves the future self-hosted vLLM deployment. Klasno will
+initially use a hosted model API through the assistant module's
+provider-independent adapter. No GPU service is deployed in the first pilot.
