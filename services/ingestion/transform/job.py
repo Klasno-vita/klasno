@@ -4,6 +4,7 @@ import os
 from services.ingestion.transform.file_selection import select_unprocessed_objects
 from services.ingestion.transform.metrics import attach_delta_boundaries
 from services.ingestion.transform.models import MetricPoint, ProcessedObject, RawObject, SleepRow
+from services.ingestion.transform.parser import parse_raw_payload
 from services.ingestion.transform.sleep import upsert_sleep_rows
 
 
@@ -56,6 +57,31 @@ def build_transform_plan(
         metric_rows=len(metric_rows),
         sleep_rows=len(sleep_rows),
     )
+
+
+def parse_selected_payloads(
+    raw_payloads: dict[str, object],
+    selected_objects: list[RawObject],
+    *,
+    student_id: str,
+) -> tuple[list[MetricPoint], list[SleepRow]]:
+    metric_points: list[MetricPoint] = []
+    sleep_rows: list[SleepRow] = []
+
+    for raw_object in selected_objects:
+        payload = raw_payloads.get(raw_object.object_key)
+        if payload is None:
+            continue
+        parsed = parse_raw_payload(
+            payload,
+            source_object_key=raw_object.object_key,
+            student_id=student_id,
+            raw_updated_at=raw_object.updated_at,
+        )
+        metric_points.extend(parsed.metric_points)
+        sleep_rows.extend(parsed.sleep_rows)
+
+    return metric_points, sleep_rows
 
 
 def main() -> None:
