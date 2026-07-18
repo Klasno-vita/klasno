@@ -10,6 +10,7 @@ This first repo version contains the testable transform core:
 - dedupe metric rows using BigQuery-style merge keys
 - calculate HR and HRV deltas without crossing student, metric, or date boundaries
 - upsert sleep rows by `(student_id, sleep_date, log_id)`
+- parse raw puller JSON for heart rate, HRV, steps, and sleep
 
 The next adapter step is to connect this package to GCS object listing, raw JSON
-parsing, BigQuery `MERGE` statements, and the transform control table.
+downloads, BigQuery `MERGE` statements, and the transform control table.
