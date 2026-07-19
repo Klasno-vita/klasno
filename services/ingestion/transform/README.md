@@ -11,6 +11,10 @@ This first repo version contains the testable transform core:
 - calculate HR and HRV deltas without crossing student, metric, or date boundaries
 - upsert sleep rows by `(student_id, sleep_date, log_id)`
 - parse raw puller JSON for heart rate, HRV, steps, and sleep
+- list and read raw JSON directly from GCS
+- prepare BigQuery control-table rows and metric/sleep `MERGE` statements
+- package the transform as a Cloud Run Job container
 
-The next adapter step is to connect this package to GCS object listing, raw JSON
-downloads, BigQuery `MERGE` statements, and the transform control table.
+The next production step is to create the BigQuery target and staging table
+schemas, run the job against a tiny GCS prefix, and compare output with the
+legacy Dataproc reference before scheduling it after the daily pull.

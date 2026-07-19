@@ -5,8 +5,9 @@
 - Phase 1 repository foundation: completed locally on `codex/foundation-hardening`.
 - Phase 2 Cloud Run puller source: imported locally in `services/ingestion/fitbit_sync`.
 - Phase 3 transform core: added locally in `services/ingestion/transform`.
-- Next task: connect the transform core to GCS listing, raw JSON downloads,
-  BigQuery `MERGE` statements, and the transform control table.
+- Next task: create BigQuery target/staging schemas, run the Cloud Run transform
+  job against a tiny GCS prefix, and compare output with the legacy Dataproc
+  reference before scheduling it after the daily pull.
 
 ## Current Context
 
@@ -211,9 +212,9 @@ Tasks:
 
 Connect `services/ingestion/transform` to GCP adapters:
 
-1. list raw GCS objects from `KLASNO_RAW_BUCKET`
-2. read transform control rows from BigQuery
+1. list raw GCS objects from `KLASNO_RAW_BUCKET`. Complete locally.
+2. read transform control rows from BigQuery. Complete locally.
 3. parse raw Fitbit / Google Health JSON into metric and sleep rows. Complete locally.
-4. write BigQuery `MERGE` statements for metric tables and sleep upserts
-5. record transform outcomes in the control table
+4. write BigQuery `MERGE` statements for metric tables and sleep upserts. Complete locally.
+5. record transform outcomes in the control table. Complete locally.
 6. run a small replay and compare against earlier Dataproc output
