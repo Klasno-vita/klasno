@@ -20,6 +20,9 @@ The next production step is to create the BigQuery target and staging table
 schemas, run the job against a tiny GCS prefix, and compare output with the
 legacy Dataproc reference before scheduling it after the daily pull.
 
+Schema SQL lives in `schemas/`. Use `apply_schemas.py` before deploying the
+Cloud Run Job.
+
 Supported raw folders:
 
 - `heart-rate`
