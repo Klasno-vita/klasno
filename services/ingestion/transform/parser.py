@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta, timezone
 from typing import Any
 
 from services.ingestion.transform.models import MetricPoint, SleepRow
@@ -7,8 +7,15 @@ from services.ingestion.transform.models import MetricPoint, SleepRow
 IST = timezone(timedelta(hours=5, minutes=30))
 
 RAW_ENDPOINT_TO_METRIC = {
+    "active-energy-burned": "active_energy_burned_kcal",
+    "active-minutes": "active_minutes",
+    "active-zone-minutes": "active_zone_minutes",
+    "activity-level": "activity_level",
+    "daily-heart-rate-variability": "daily_hrv_rmssd",
+    "daily-resting-heart-rate": "daily_resting_heart_rate",
     "heart-rate": "heart_rate",
     "heart-rate-variability": "hrv_rmssd",
+    "sedentary-period": "sedentary_minutes",
     "steps": "steps",
 }
 
@@ -45,7 +52,85 @@ def parse_raw_payload(
         )
     if endpoint == "steps":
         return ParsedRawPayload(
-            metric_points=_parse_steps(points, student_id, source_object_key),
+            metric_points=_parse_interval_metric(
+                points,
+                student_id,
+                source_object_key,
+                payload_key="steps",
+                metric="steps",
+                value_key="count",
+            ),
+            sleep_rows=[],
+        )
+    if endpoint == "active-minutes":
+        return ParsedRawPayload(
+            metric_points=_parse_interval_metric(
+                points,
+                student_id,
+                source_object_key,
+                payload_key="activeMinutes",
+                metric="active_minutes",
+                value_key="minutes",
+            ),
+            sleep_rows=[],
+        )
+    if endpoint == "active-energy-burned":
+        return ParsedRawPayload(
+            metric_points=_parse_interval_metric(
+                points,
+                student_id,
+                source_object_key,
+                payload_key="activeEnergyBurned",
+                metric="active_energy_burned_kcal",
+                value_key="kcal",
+            ),
+            sleep_rows=[],
+        )
+    if endpoint == "active-zone-minutes":
+        return ParsedRawPayload(
+            metric_points=_parse_interval_metric(
+                points,
+                student_id,
+                source_object_key,
+                payload_key="activeZoneMinutes",
+                metric="active_zone_minutes",
+                value_key="activeZoneMinutes",
+                metadata_keys=("heartRateZone",),
+            ),
+            sleep_rows=[],
+        )
+    if endpoint == "activity-level":
+        return ParsedRawPayload(
+            metric_points=_parse_activity_level(points, student_id, source_object_key),
+            sleep_rows=[],
+        )
+    if endpoint == "sedentary-period":
+        return ParsedRawPayload(
+            metric_points=_parse_sedentary_period(points, student_id, source_object_key),
+            sleep_rows=[],
+        )
+    if endpoint == "daily-resting-heart-rate":
+        return ParsedRawPayload(
+            metric_points=_parse_daily_metric(
+                points,
+                student_id,
+                source_object_key,
+                payload_key="dailyRestingHeartRate",
+                metric="daily_resting_heart_rate",
+                value_key="beatsPerMinute",
+            ),
+            sleep_rows=[],
+        )
+    if endpoint == "daily-heart-rate-variability":
+        return ParsedRawPayload(
+            metric_points=_parse_daily_metric(
+                points,
+                student_id,
+                source_object_key,
+                payload_key="dailyHeartRateVariability",
+                metric="daily_hrv_rmssd",
+                value_key="rootMeanSquareOfSuccessiveDifferencesMilliseconds",
+            ),
             sleep_rows=[],
         )
     if endpoint == "sleep":
@@ -150,25 +235,69 @@ def _parse_hrv(
     return rows
 
 
-def _parse_steps(
+def _parse_interval_metric(
+    points: list[dict[str, Any]],
+    student_id: str,
+    source_object_key: str,
+    *,
+    payload_key: str,
+    metric: str,
+    value_key: str,
+    metadata_keys: tuple[str, ...] = (),
+) -> list[MetricPoint]:
+    rows: list[MetricPoint] = []
+    for entry in points:
+        payload = _get_any(entry, _case_keys(payload_key))
+        if not isinstance(payload, dict):
+            continue
+
+        interval = payload.get("interval") or {}
+        start = _to_local_datetime(_get_any(interval, ("startTime", "starttime")))
+        end = _to_local_datetime(_get_any(interval, ("endTime", "endtime")))
+        value = _to_float(_get_any(payload, _case_keys(value_key)))
+        if start is None or value is None:
+            continue
+
+        metadata: dict[str, Any] = {}
+        if end is not None:
+            metadata["end_local"] = end.isoformat()
+            metadata["duration_seconds"] = int((end - start).total_seconds())
+        for key in metadata_keys:
+            metadata[key] = _get_any(payload, _case_keys(key))
+
+        rows.append(
+            MetricPoint(
+                student_id=student_id,
+                metric=metric,
+                local_date=start.date(),
+                local_time=start.time().replace(tzinfo=None),
+                value=value,
+                source_object_key=source_object_key,
+                metadata=metadata or None,
+            )
+        )
+    return rows
+
+
+def _parse_activity_level(
     points: list[dict[str, Any]],
     student_id: str,
     source_object_key: str,
 ) -> list[MetricPoint]:
     rows: list[MetricPoint] = []
     for entry in points:
-        steps = _get_any(entry, ("steps",))
-        if not isinstance(steps, dict):
+        activity = _get_any(entry, ("activityLevel", "activitylevel"))
+        if not isinstance(activity, dict):
             continue
 
-        interval = steps.get("interval") or {}
+        interval = activity.get("interval") or {}
         start = _to_local_datetime(_get_any(interval, ("startTime", "starttime")))
         end = _to_local_datetime(_get_any(interval, ("endTime", "endtime")))
-        count = _to_float(_get_any(steps, ("count",)))
-        if start is None or count is None:
+        level = _get_any(activity, ("activityLevelType", "activityleveltype"))
+        if start is None or level is None:
             continue
 
-        metadata: dict[str, Any] = {}
+        metadata: dict[str, Any] = {"level": level}
         if end is not None:
             metadata["end_local"] = end.isoformat()
             metadata["duration_seconds"] = int((end - start).total_seconds())
@@ -176,12 +305,80 @@ def _parse_steps(
         rows.append(
             MetricPoint(
                 student_id=student_id,
-                metric="steps",
+                metric=f"activity_level_{str(level).lower()}",
                 local_date=start.date(),
                 local_time=start.time().replace(tzinfo=None),
-                value=count,
+                value=1,
                 source_object_key=source_object_key,
-                metadata=metadata or None,
+                metadata=metadata,
+            )
+        )
+    return rows
+
+
+def _parse_sedentary_period(
+    points: list[dict[str, Any]],
+    student_id: str,
+    source_object_key: str,
+) -> list[MetricPoint]:
+    rows: list[MetricPoint] = []
+    for entry in points:
+        sedentary = _get_any(entry, ("sedentaryPeriod", "sedentaryperiod"))
+        if not isinstance(sedentary, dict):
+            continue
+
+        interval = sedentary.get("interval") or {}
+        start = _to_local_datetime(_get_any(interval, ("startTime", "starttime")))
+        end = _to_local_datetime(_get_any(interval, ("endTime", "endtime")))
+        if start is None or end is None:
+            continue
+
+        duration_seconds = int((end - start).total_seconds())
+        rows.append(
+            MetricPoint(
+                student_id=student_id,
+                metric="sedentary_minutes",
+                local_date=start.date(),
+                local_time=start.time().replace(tzinfo=None),
+                value=round(duration_seconds / 60, 4),
+                source_object_key=source_object_key,
+                metadata={
+                    "end_local": end.isoformat(),
+                    "duration_seconds": duration_seconds,
+                },
+            )
+        )
+    return rows
+
+
+def _parse_daily_metric(
+    points: list[dict[str, Any]],
+    student_id: str,
+    source_object_key: str,
+    *,
+    payload_key: str,
+    metric: str,
+    value_key: str,
+) -> list[MetricPoint]:
+    rows: list[MetricPoint] = []
+    for entry in points:
+        payload = _get_any(entry, _case_keys(payload_key))
+        if not isinstance(payload, dict):
+            continue
+
+        local_date = _parse_date(_get_any(payload, ("date",)))
+        value = _to_float(_get_any(payload, _case_keys(value_key)))
+        if local_date is None or value is None:
+            continue
+
+        rows.append(
+            MetricPoint(
+                student_id=student_id,
+                metric=metric,
+                local_date=local_date,
+                local_time=datetime.min.time(),
+                value=value,
+                source_object_key=source_object_key,
             )
         )
     return rows
@@ -269,6 +466,19 @@ def _get_any(mapping: Any, keys: tuple[str, ...]) -> Any:
         if key in mapping:
             return mapping[key]
     return None
+
+
+def _case_keys(key: str) -> tuple[str, ...]:
+    return (key, key[:1].lower() + key[1:], key.lower())
+
+
+def _parse_date(value: Any) -> date | None:
+    if not value:
+        return None
+    try:
+        return date.fromisoformat(str(value))
+    except ValueError:
+        return None
 
 
 def _to_local_datetime(value: Any) -> datetime | None:

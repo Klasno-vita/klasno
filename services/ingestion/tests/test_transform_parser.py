@@ -87,6 +87,123 @@ def test_parses_steps_with_interval_metadata() -> None:
     }
 
 
+def test_parses_activity_interval_metrics_needed_for_wellness() -> None:
+    cases = [
+        ("active-minutes", "activeMinutes", "minutes", "active_minutes", "20"),
+        ("active-energy-burned", "activeEnergyBurned", "kcal", "active_energy_burned_kcal", "45.5"),
+        ("active-zone-minutes", "activeZoneMinutes", "activeZoneMinutes", "active_zone_minutes", "8"),
+    ]
+
+    for endpoint, payload_key, value_key, metric, value in cases:
+        parsed = parse_raw_payload(
+            {
+                "dataPoints": [
+                    {
+                        payload_key: {
+                            "interval": {
+                                "startTime": "2026-07-17T04:30:00Z",
+                                "endTime": "2026-07-17T04:45:00Z",
+                            },
+                            value_key: value,
+                            "heartRateZone": "CARDIO",
+                        }
+                    }
+                ]
+            },
+            source_object_key=f"gs://bucket/health-data/raw/{endpoint}/file.json#1",
+            student_id="student-a",
+            raw_updated_at=datetime(2026, 7, 17, tzinfo=UTC),
+        )
+
+        point = parsed.metric_points[0]
+        assert point.metric == metric
+        assert point.value == float(value)
+        assert point.metadata["duration_seconds"] == 900
+
+
+def test_parses_activity_level_as_categorical_metric() -> None:
+    parsed = parse_raw_payload(
+        {
+            "dataPoints": [
+                {
+                    "activityLevel": {
+                        "interval": {
+                            "startTime": "2026-07-17T04:30:00Z",
+                            "endTime": "2026-07-17T05:00:00Z",
+                        },
+                        "activityLevelType": "LIGHT",
+                    }
+                }
+            ]
+        },
+        source_object_key="gs://bucket/health-data/raw/activity-level/file.json#1",
+        student_id="student-a",
+        raw_updated_at=datetime(2026, 7, 17, tzinfo=UTC),
+    )
+
+    point = parsed.metric_points[0]
+    assert point.metric == "activity_level_light"
+    assert point.value == 1
+    assert point.metadata["level"] == "LIGHT"
+
+
+def test_parses_sedentary_period_as_minutes() -> None:
+    parsed = parse_raw_payload(
+        {
+            "dataPoints": [
+                {
+                    "sedentaryPeriod": {
+                        "interval": {
+                            "startTime": "2026-07-17T04:30:00Z",
+                            "endTime": "2026-07-17T05:30:00Z",
+                        }
+                    }
+                }
+            ]
+        },
+        source_object_key="gs://bucket/health-data/raw/sedentary-period/file.json#1",
+        student_id="student-a",
+        raw_updated_at=datetime(2026, 7, 17, tzinfo=UTC),
+    )
+
+    point = parsed.metric_points[0]
+    assert point.metric == "sedentary_minutes"
+    assert point.value == 60
+
+
+def test_parses_daily_resting_hr_and_daily_hrv() -> None:
+    cases = [
+        (
+            "daily-resting-heart-rate",
+            "dailyRestingHeartRate",
+            "beatsPerMinute",
+            "daily_resting_heart_rate",
+            62,
+        ),
+        (
+            "daily-heart-rate-variability",
+            "dailyHeartRateVariability",
+            "rootMeanSquareOfSuccessiveDifferencesMilliseconds",
+            "daily_hrv_rmssd",
+            34.2,
+        ),
+    ]
+
+    for endpoint, payload_key, value_key, metric, value in cases:
+        parsed = parse_raw_payload(
+            {"dataPoints": [{payload_key: {"date": "2026-07-17", value_key: value}}]},
+            source_object_key=f"gs://bucket/health-data/raw/{endpoint}/file.json#1",
+            student_id="student-a",
+            raw_updated_at=datetime(2026, 7, 17, tzinfo=UTC),
+        )
+
+        point = parsed.metric_points[0]
+        assert point.metric == metric
+        assert point.local_date.isoformat() == "2026-07-17"
+        assert point.local_time.isoformat() == "00:00:00"
+        assert point.value == value
+
+
 def test_parses_sleep_and_keeps_latest_duplicate_session() -> None:
     parsed = parse_raw_payload(
         {
