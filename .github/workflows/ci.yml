@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  foundation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - name: Install development tools
+        run: uv sync --extra dev
+      - name: Check Python sources
+        run: uv run ruff check .
+      - name: Validate Compose configuration
+        run: docker compose config --quiet
+      - name: Verify foundation files
+        shell: bash
+        run: |
+          test -f ARCHITECTURE.md
+          test -f docs/data-dictionary.md
+          test -f docs/adr/0002-migrate-existing-gcp-pipeline.md
+          test -f services/ingestion/README.md

@@ -1,0 +1,15 @@
+{
+  "folders": [
+    {
+      "name": "KLaSNo",
+      "path": "."
+    }
+  ],
+  "settings": {
+    "files.exclude": {
+      "**/.pytest_cache": true,
+      "**/.ruff_cache": true,
+      "**/__pycache__": true
+    }
+  }
+}
