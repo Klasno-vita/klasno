@@ -67,6 +67,12 @@ class SleepRow:
     efficiency: float | None
     source_object_key: str
     updated_at: datetime
+    is_nap: bool = False
+    minutes_awake: int | None = None
+    light_sleep_minutes: int | None = None
+    deep_sleep_minutes: int | None = None
+    rem_sleep_minutes: int | None = None
+    stages_status: str | None = None
 
     @property
     def upsert_key(self) -> tuple[str, date, str]:

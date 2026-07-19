@@ -10,6 +10,10 @@ dev = [
   "pytest>=8.3,<9",
   "ruff>=0.9,<1",
 ]
+gcp = [
+  "google-cloud-bigquery>=3.25,<4",
+  "google-cloud-storage>=2.18,<3",
+]
 
 [tool.uv]
 package = false
