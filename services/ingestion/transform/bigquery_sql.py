@@ -1,3 +1,5 @@
+import json
+
 from services.ingestion.transform.models import MetricRow, ProcessedObject, RawObject, SleepRow
 
 
@@ -140,6 +142,7 @@ def control_success_row(
 
 
 def metric_row_to_bq(row: MetricRow) -> dict[str, object]:
+    metadata_json = json.dumps(row.metadata, separators=(",", ":")) if row.metadata else None
     return {
         "student_id": row.student_id,
         "metric": row.metric,
@@ -148,7 +151,7 @@ def metric_row_to_bq(row: MetricRow) -> dict[str, object]:
         "value": row.value,
         "delta_from_prev": row.delta_from_prev,
         "source_object_key": row.source_object_key,
-        "metadata_json": row.metadata,
+        "metadata_json": metadata_json,
     }
 
 

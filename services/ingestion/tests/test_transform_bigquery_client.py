@@ -56,12 +56,16 @@ def test_stages_metric_rows_as_json() -> None:
         value=72,
         delta_from_prev=None,
         source_object_key="gs://bucket/hr.json#1",
+        metadata={"zone": "out_of_range"},
     )
 
     count = store.stage_metric_rows([row], "stg_metric_points")
 
     assert count == 1
     assert client.inserted["project.health_raw.stg_metric_points"][0]["metric"] == "heart_rate"
+    assert client.inserted["project.health_raw.stg_metric_points"][0]["metadata_json"] == (
+        '{"zone":"out_of_range"}'
+    )
 
 
 def test_stages_metric_rows_in_chunks() -> None:
