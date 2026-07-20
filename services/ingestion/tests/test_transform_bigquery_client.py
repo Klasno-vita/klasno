@@ -2,7 +2,7 @@ from datetime import UTC, date, datetime, time
 
 import pytest
 
-from services.ingestion.transform.bigquery_client import BigQueryTransformStore
+from services.ingestion.transform.bigquery_client import INSERT_CHUNK_SIZE, BigQueryTransformStore
 from services.ingestion.transform.bigquery_sql import metric_merge_sql, sleep_merge_sql
 from services.ingestion.transform.models import MetricRow, RawObject, SleepRow
 
@@ -19,6 +19,7 @@ class FakeBigQueryClient:
     def __init__(self) -> None:
         self.queries: list[str] = []
         self.inserted: dict[str, list[dict[str, object]]] = {}
+        self.insert_calls: list[tuple[str, int]] = []
         self.insert_errors: list[object] = []
 
     def query(self, query: str) -> FakeJob:
@@ -28,7 +29,8 @@ class FakeBigQueryClient:
         return FakeJob()
 
     def insert_rows_json(self, table: str, json_rows: list[dict[str, object]]) -> list[object]:
-        self.inserted[table] = json_rows
+        self.inserted.setdefault(table, []).extend(json_rows)
+        self.insert_calls.append((table, len(json_rows)))
         return self.insert_errors
 
 
@@ -60,6 +62,31 @@ def test_stages_metric_rows_as_json() -> None:
 
     assert count == 1
     assert client.inserted["project.health_raw.stg_metric_points"][0]["metric"] == "heart_rate"
+
+
+def test_stages_metric_rows_in_chunks() -> None:
+    client = FakeBigQueryClient()
+    store = BigQueryTransformStore(client, project_id="project", dataset="health_raw")
+    rows = [
+        MetricRow(
+            student_id="student-a",
+            metric="heart_rate",
+            local_date=date(2026, 7, 17),
+            local_time=time(hour=index % 24, minute=index % 60),
+            value=72,
+            delta_from_prev=None,
+            source_object_key=f"gs://bucket/hr.json#{index}",
+        )
+        for index in range(INSERT_CHUNK_SIZE + 1)
+    ]
+
+    count = store.stage_metric_rows(rows, "stg_metric_points")
+
+    assert count == INSERT_CHUNK_SIZE + 1
+    assert client.insert_calls == [
+        ("project.health_raw.stg_metric_points", INSERT_CHUNK_SIZE),
+        ("project.health_raw.stg_metric_points", 1),
+    ]
 
 
 def test_staging_raises_on_bigquery_insert_errors() -> None:
