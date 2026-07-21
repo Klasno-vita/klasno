@@ -31,7 +31,13 @@ WHERE status IN ('success', 'succeeded', 'processed')
 def metric_merge_sql(target_table_id: str, staging_table_id: str) -> str:
     return f"""
 MERGE `{target_table_id}` AS target
-USING `{staging_table_id}` AS source
+USING (
+  SELECT * FROM `{staging_table_id}`
+  QUALIFY ROW_NUMBER() OVER (
+    PARTITION BY student_id, metric, local_date, local_time
+    ORDER BY source_object_key DESC
+  ) = 1
+) AS source
 ON target.student_id = source.student_id
   AND target.metric = source.metric
   AND target.local_date = source.local_date
@@ -71,7 +77,13 @@ WHEN NOT MATCHED THEN INSERT (
 def sleep_merge_sql(target_table_id: str, staging_table_id: str) -> str:
     return f"""
 MERGE `{target_table_id}` AS target
-USING `{staging_table_id}` AS source
+USING (
+  SELECT * FROM `{staging_table_id}`
+  QUALIFY ROW_NUMBER() OVER (
+    PARTITION BY student_id, sleep_date, log_id
+    ORDER BY updated_at DESC, source_object_key DESC
+  ) = 1
+) AS source
 ON target.student_id = source.student_id
   AND target.sleep_date = source.sleep_date
   AND target.log_id = source.log_id
