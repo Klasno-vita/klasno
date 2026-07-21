@@ -146,8 +146,11 @@ def test_merge_sql_uses_expected_keys() -> None:
     assert "target.metric = source.metric" in metric_sql
     assert "target.local_date = source.local_date" in metric_sql
     assert "target.local_time = source.local_time" in metric_sql
+    assert "PARTITION BY student_id, metric, local_date, local_time" in metric_sql
+    assert "QUALIFY ROW_NUMBER()" in metric_sql
     assert "target.sleep_date = source.sleep_date" in sleep_sql
     assert "target.log_id = source.log_id" in sleep_sql
+    assert "PARTITION BY student_id, sleep_date, log_id" in sleep_sql
     assert "source.updated_at >= target.updated_at" in sleep_sql
 
 
