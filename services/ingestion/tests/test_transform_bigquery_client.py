@@ -4,6 +4,7 @@ import pytest
 
 from services.ingestion.transform.bigquery_client import INSERT_CHUNK_SIZE, BigQueryTransformStore
 from services.ingestion.transform.bigquery_sql import metric_merge_sql, sleep_merge_sql
+from services.ingestion.transform.table_routing import target_table_for_source
 from services.ingestion.transform.models import MetricRow, RawObject, SleepRow
 
 
@@ -148,3 +149,16 @@ def test_merge_sql_uses_expected_keys() -> None:
     assert "target.sleep_date = source.sleep_date" in sleep_sql
     assert "target.log_id = source.log_id" in sleep_sql
     assert "source.updated_at >= target.updated_at" in sleep_sql
+
+
+def test_routes_metric_rows_by_source_folder() -> None:
+    assert (
+        target_table_for_source(
+            "gs://bucket/health-data/raw/heart-rate-variability/start=2026-06-23/file.json#1"
+        )
+        == "heart_rate_variability_points"
+    )
+    assert (
+        target_table_for_source("gs://bucket/health-data/raw/steps/start=2026-06-23/file.json#1")
+        == "steps_points"
+    )

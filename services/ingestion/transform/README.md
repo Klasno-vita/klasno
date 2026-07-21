@@ -13,12 +13,13 @@ This first repo version contains the testable transform core:
 - parse raw puller JSON for heart rate, HRV, steps, sleep, activity, sedentary,
   daily resting heart rate, and daily HRV
 - list and read raw JSON directly from GCS
+- route metric rows into one transformed BigQuery table per raw source folder
 - prepare BigQuery control-table rows and metric/sleep `MERGE` statements
 - package the transform as a Cloud Run Job container
 
-The next production step is to create the BigQuery target and staging table
-schemas, run the job against a tiny GCS prefix, and compare output with the
-legacy Dataproc reference before scheduling it after the daily pull.
+The job processes the oldest unprocessed `start=YYYY-MM-DD` raw paths first.
+After backfill catches up, later runs skip already successful files and continue
+with fresh raw files.
 
 Schema SQL lives in `schemas/`. Use `apply_schemas.py` before deploying the
 Cloud Run Job.
@@ -36,3 +37,7 @@ Supported raw folders:
 - `sedentary-period`
 - `daily-resting-heart-rate`
 - `daily-heart-rate-variability`
+
+Transformed metric table names use the source folder plus `_points`, for
+example `heart_rate_points`, `heart_rate_variability_points`, and
+`active_energy_burned_points`.
