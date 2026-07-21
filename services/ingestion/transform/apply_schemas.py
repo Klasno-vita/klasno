@@ -6,8 +6,7 @@ from google.cloud import bigquery
 SCHEMA_DIR = Path(__file__).parent / "schemas"
 SCHEMA_FILES = [
     "control_table.sql",
-    "metric_points.sql",
-    "stg_metric_points.sql",
+    "metric_source_tables.sql",
     "sleep_sessions.sql",
     "stg_sleep_sessions.sql",
 ]

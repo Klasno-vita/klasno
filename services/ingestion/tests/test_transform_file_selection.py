@@ -24,6 +24,25 @@ def test_selects_only_unprocessed_objects_in_stable_order() -> None:
     assert selected == [newer]
 
 
+def test_orders_raw_objects_by_start_date_before_updated_time() -> None:
+    june = RawObject(
+        bucket="raw-bucket",
+        name="health-data/raw/heart-rate/start=2026-06-23/end=2026-06-25/file.json",
+        generation="1",
+        updated_at=datetime(2026, 7, 19, 10, 0, tzinfo=UTC),
+    )
+    july = RawObject(
+        bucket="raw-bucket",
+        name="health-data/raw/heart-rate/start=2026-07-02/end=2026-07-03/file.json",
+        generation="1",
+        updated_at=datetime(2026, 7, 2, 10, 0, tzinfo=UTC),
+    )
+
+    selected = select_unprocessed_objects([july, june], [], prefix="health-data/raw/")
+
+    assert selected == [june, july]
+
+
 def test_failed_control_rows_are_retryable() -> None:
     raw_object = RawObject(
         bucket="raw-bucket",

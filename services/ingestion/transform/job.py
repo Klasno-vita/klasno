@@ -5,9 +5,10 @@ from services.ingestion.transform.bigquery_client import BigQueryTransformStore
 from services.ingestion.transform.file_selection import select_unprocessed_objects
 from services.ingestion.transform.gcs_client import GcsRawStore
 from services.ingestion.transform.metrics import attach_delta_boundaries
-from services.ingestion.transform.models import MetricPoint, ProcessedObject, RawObject, SleepRow
+from services.ingestion.transform.models import MetricPoint, MetricRow, ProcessedObject, RawObject, SleepRow
 from services.ingestion.transform.parser import parse_raw_payload
 from services.ingestion.transform.sleep import upsert_sleep_rows
+from services.ingestion.transform.table_routing import staging_table_for_target, target_table_for_source
 
 
 @dataclass(frozen=True)
@@ -18,8 +19,6 @@ class TransformConfig:
     gcp_project: str
     bq_dataset: str
     control_table: str
-    metric_table: str
-    metric_staging_table: str
     sleep_table: str
     sleep_staging_table: str
     student_id: str
@@ -33,8 +32,6 @@ class TransformConfig:
             gcp_project=_required_env("KLASNO_GCP_PROJECT"),
             bq_dataset=_required_env("KLASNO_BQ_DATASET"),
             control_table=os.getenv("KLASNO_TRANSFORM_CONTROL_TABLE", "transform_control"),
-            metric_table=os.getenv("KLASNO_BQ_METRIC_TABLE", "metric_points"),
-            metric_staging_table=os.getenv("KLASNO_BQ_METRIC_STAGING_TABLE", "stg_metric_points"),
             sleep_table=os.getenv("KLASNO_BQ_SLEEP_TABLE", "sleep_sessions"),
             sleep_staging_table=os.getenv("KLASNO_BQ_SLEEP_STAGING_TABLE", "stg_sleep_sessions"),
             student_id=os.getenv("KLASNO_DEFAULT_STUDENT_ID", "default-student"),
@@ -131,12 +128,14 @@ def run_transform(config: TransformConfig) -> TransformPlan:
     metric_rows = attach_delta_boundaries(metric_points)
     sleep_rows = upsert_sleep_rows([], incoming_sleep_rows)
 
-    bq_store.stage_metric_rows(metric_rows, config.metric_staging_table)
+    for target_table, target_metric_rows in group_metric_rows_by_target(metric_rows).items():
+        staging_table = staging_table_for_target(target_table)
+        bq_store.stage_metric_rows(target_metric_rows, staging_table)
+        bq_store.merge_metric_rows(
+            target_table=target_table,
+            staging_table=staging_table,
+        )
     bq_store.stage_sleep_rows(sleep_rows, config.sleep_staging_table)
-    bq_store.merge_metric_rows(
-        target_table=config.metric_table,
-        staging_table=config.metric_staging_table,
-    )
     bq_store.merge_sleep_rows(
         target_table=config.sleep_table,
         staging_table=config.sleep_staging_table,
@@ -160,6 +159,16 @@ def _required_env(name: str) -> str:
     if not value:
         raise RuntimeError(f"Missing required environment variable: {name}")
     return value
+
+
+def group_metric_rows_by_target(rows: list[MetricRow]) -> dict[str, list[MetricRow]]:
+    grouped: dict[str, list[MetricRow]] = {}
+    for row in rows:
+        target_table = target_table_for_source(row.source_object_key)
+        if target_table is None:
+            continue
+        grouped.setdefault(target_table, []).append(row)
+    return grouped
 
 
 if __name__ == "__main__":
